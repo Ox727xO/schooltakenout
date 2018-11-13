@@ -11,6 +11,9 @@ import android.widget.Toast;
 
 import com.wy.schooltakenout.R;
 import com.wy.schooltakenout.Tool.IOTool;
+import com.wy.schooltakenout.Tool.TestPrinter;
+
+import junit.framework.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -50,22 +53,22 @@ public class SigninActivity extends AppCompatActivity implements View.OnClickLis
                 String phone = userPhoneEdit.getText().toString();
                 String password = passwordEdit.getText().toString();
                 // 判断登录信息完整性
-                if(!phone.equals("") && !password.equals("")) {
+                if(!name.equals("") && !phone.equals("") && !password.equals("")) {
                     // 得到url
-                    String url = IOTool.ip + "user/register.do";
+                    String url = IOTool.ip + "write/user/register.do";
+                    TestPrinter.print(url);
                     // 将数据封装
                     List<String> list = new ArrayList<>();
-                    list.add("name_"+name);
-                    list.add("phone_"+phone);
-                    list.add("password_"+password);
+                    list.add("name="+name);
+                    list.add("phone="+phone);
+                    list.add("passWord="+password);
                     // 发送往服务器
-                    String result = IOTool.upAndDown(url, list);
+                    IOTool.upAndDown(url, list);
+                    int status = IOTool.getStatus();
                     // 对服务器返回内容进行处理
-                    if(result == null) {
-                        Toast.makeText(SigninActivity.this, "服务器连接失败", Toast.LENGTH_LONG).show();
-                    } else if(result.equals("0")) {
+                    if(status == 0) {
                         Toast.makeText(SigninActivity.this, "注册失败", Toast.LENGTH_LONG).show();
-                    } else {
+                    } else if(status == 1) {
                         Toast.makeText(SigninActivity.this, "注册成功", Toast.LENGTH_LONG).show();
                         finish();
                     }

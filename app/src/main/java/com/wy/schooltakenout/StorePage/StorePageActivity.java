@@ -1,6 +1,8 @@
 package com.wy.schooltakenout.StorePage;
 
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
@@ -16,14 +18,18 @@ import com.wy.schooltakenout.Data.Orders;
 import com.wy.schooltakenout.Data.Seller;
 import com.wy.schooltakenout.R;
 import com.wy.schooltakenout.Tool.IOTool;
+import com.wy.schooltakenout.Tool.TestPrinter;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.File;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
 public class StorePageActivity extends AppCompatActivity {
     //本商店的数据
-    private Intent intent;
     private Seller thisSeller;
 
     @Override
@@ -36,54 +42,49 @@ public class StorePageActivity extends AppCompatActivity {
     private void init() {
         String url;
         List<String> list;
-        String json;
         Gson gson = new Gson();
-        intent = getIntent();
+        Intent intent = getIntent();
 
-        //获取布局中的构件
+        // 获取布局中的构件
         ImageView imageView = findViewById(R.id.store_img);
         TextView nameView = findViewById(R.id.store_name);
         RecyclerView orderView = findViewById(R.id.store_orders);
 
-        //获取传输过来的商店数据
-        int storeID = intent.getIntExtra("storeID", 0);
-//        String storeName = intent.getStringExtra("name");
-//        int storeImg = intent.getIntExtra("img", 0);
-//        List<String> storeTags = intent.getStringArrayListExtra("tags");
-//        int storeFoodNum = intent.getIntExtra("storeFoodNum", 0);
-//        double storeFee = intent.getDoubleExtra("storeFee", 0.00);
-//        thisSeller = new Seller(storeNo, storeName, storeImg, storeTags, storeFoodNum, storeFee);
-        url = IOTool.ip+"seller/info.do";
+        // 获取传输过来的商店数据
+        int sellerID = intent.getIntExtra("sellerID", 0);
+        url = IOTool.ip+"read/seller/info.do";
         list = new ArrayList<>();
-        list.add("sellerID_"+storeID);
-        json = IOTool.upAndDown(url, list);
-        thisSeller = gson.fromJson(json, Seller.class);
+        list.add("sellerID="+sellerID);
+        IOTool.upAndDown(url, list);
+        JSONObject jsonObject = IOTool.getData();
+        thisSeller = gson.fromJson(jsonObject.toString(), Seller.class);
+        thisSeller.setSellerPosition(0);
 
-        //添加商店的美食数据
-//        final List<Orders> ordersList = new ArrayList<>();
-//        for(int i=0; i<thisSeller.getStoreFoodNum(); i++) {
-//            Orders order;
-//            //测试数据
-//            order = new Orders(i, "泡椒风爪"+i, R.drawable.ic_food, "用户", "15200000000");
-//
-//            ordersList.add(order);
-//        }
-        url = IOTool.ip+"orders/list.do";
+        // 获取商店的订单数据
+        url = IOTool.ip+"read/orders/list.do";
         list = new ArrayList<>();
-        list.add("sellerID_"+storeID);
-        json = IOTool.upAndDown(url, list);
+        list.add("sellerID="+sellerID);
+        IOTool.upAndDown(url, list);
+        JSONArray jsonArray = IOTool.getDateArray();
         Type type = new TypeToken<List<Orders>>(){}.getType();
-        final List<Orders> ordersList = gson.fromJson(json, type);
+        final List<Orders> ordersList = gson.fromJson(jsonArray.toString(), type);
 
-        //使用传输的数据进行构件的初始化赋值
-        imageView.setImageResource(thisSeller.getStoreImg());
-        nameView.setText(thisSeller.getStoreName());
+        // 读出商家头像
+        String filename = thisSeller.getSellerID()+".jpg";
+        url = IOTool.pictureIp+"resources/seller/head/"+filename;
+        String path = this.getFileStreamPath("store_"+filename).getPath();
+        File file = new File(path);
+        IOTool.savePicture(url, path);
+
+        // 使用传输的数据进行构件的初始化赋值
+        imageView.setImageBitmap(BitmapFactory.decodeFile(file.getAbsolutePath()));
+        nameView.setText(thisSeller.getName());
 
         //必要，但是不知道有什么用
         GridLayoutManager orderLayoutManager=new GridLayoutManager(this,1);
         orderView.setLayoutManager(orderLayoutManager);
         //设置适配器
-        OrderAdapter orderAdapter = new OrderAdapter(ordersList);
+        OrderAdapter orderAdapter = new OrderAdapter(ordersList, sellerID);
         orderView.setAdapter(orderAdapter);
     }
 }

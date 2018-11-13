@@ -19,6 +19,9 @@ import com.wy.schooltakenout.Data.Seller;
 import com.wy.schooltakenout.R;
 import com.wy.schooltakenout.Tool.IOTool;
 
+import org.json.JSONArray;
+
+import java.io.File;
 import java.lang.reflect.Type;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -29,49 +32,53 @@ public class CartAdapter extends RecyclerView.Adapter {
     private List<Object> chosenList;
     private final int ITEM_STORE = 1, ITEM_FOOD = 2;
 
-    public CartAdapter(int[][] chosenFood, int storeNum) {
+    public CartAdapter(int[][] chosenFood) {
         // 一些变量
         String url;
-        String json;
+        JSONArray json;
         Type type;
         Gson gson = new Gson();
 
-        //找出点过菜的商家，将购物车信息按顺序排列为List<Object>
+        // 找出点过菜的商家，将购物车信息按顺序排列为List<Object>
         chosenList = new ArrayList<>();
-        //测试数据
-//        List<String> storeTags = new ArrayList<>();
-//        storeTags.add("不好吃");
-//        storeTags.add("冷饮");
         List<Goods> storeGoods = new ArrayList<>();
+
         // 从服务器获取商家列表
-        url = IOTool.ip+"user/info.do";
-        json = IOTool.upAndDown(url, null);
+        url = IOTool.ip+"read/seller/list.do";
+        IOTool.upAndDown(url, null);
+        json = IOTool.getDateArray();
+
         // 解析商家列表
-        List<Seller> sellerList = new ArrayList<>();
-        sellerList.clear();
         type = new TypeToken<List<Seller>>(){}.getType();
-        sellerList = gson.fromJson(json, type);
-        storeNum = sellerList.size();
+        List<Seller> sellerList = gson.fromJson(json.toString(), type);
+        for(int i=0; i<sellerList.size(); i++) {
+            sellerList.get(i).setSellerPosition(i);
+        }
 
+        // 遍历商家列表，找到数量大于0的美食
         int flag;
-        for(int i=0; i<storeNum; i++) {
+        for(int i=0; i<sellerList.size(); i++) {
+            // flag表示这个商店或商店的美食被选择了
             flag = 0;
-            Seller seller;
-//            seller = new Seller(i, "食堂"+i, R.drawable.ic_store_img, i+1, 2.00);
-            seller = sellerList.get(i);
-            // 获取该商店的美食列表
-            url = IOTool.ip+"good/list.do";
-            List<String> list = new ArrayList<>();
-            list.add("sellerID_"+seller.getSellerID());
-            json = IOTool.upAndDown(url, list);
-            type = new TypeToken<List<Goods>>(){}.getType();
-            List<Goods> goodsList = gson.fromJson(json, type);
 
+            Seller seller = sellerList.get(i);
+            // 获取该商店的美食列表
+            url = IOTool.ip+"read/good/list.do";
+            List<String> list = new ArrayList<>();
+            list.add("sellerID="+seller.getSellerID());
+            IOTool.upAndDown(url, list);
+            json = IOTool.getDateArray();
+            type = new TypeToken<List<Goods>>(){}.getType();
+            List<Goods> goodsList = gson.fromJson(json.toString(), type);
+
+            // 遍历美食列表
             storeGoods.clear();
             for(int j = 0; j< goodsList.size(); j++) {
                 if(chosenFood[i][j] != 0) {
                     flag = 1;
-                    Goods goods = goodsList.get(i);
+                    Goods goods = goodsList.get(j);
+                    // 因为服务器传来的没有这个数据，自己添加
+                    goods.setNum(chosenFood[i][j]);
                     storeGoods.add(goods);
                 }
             }
@@ -145,8 +152,15 @@ public class CartAdapter extends RecyclerView.Adapter {
             final ViewHolderStore viewHolderStore = (ViewHolderStore) holder;
             final Seller seller = (Seller) chosenList.get(position);
 
-            Glide.with(context).load(seller.getStoreImg()).into(viewHolderStore.storeImage);
-            viewHolderStore.storeName.setText(seller.getStoreName());
+            // 读出商家头像
+            String filename = seller.getSellerID()+".jpg";
+            String url = IOTool.pictureIp+"resources/seller/head/"+filename;
+            String path = this.context.getFileStreamPath("store_"+filename).getPath();
+            File file = new File(path);
+            IOTool.savePicture(url, path);
+
+            Glide.with(context).load(file).into(viewHolderStore.storeImage);
+            viewHolderStore.storeName.setText(seller.getName());
 
             //设置点击响应
             if(onItemClickListener!= null){
@@ -167,11 +181,18 @@ public class CartAdapter extends RecyclerView.Adapter {
             final ViewHolderFood viewHolderFood = (ViewHolderFood) holder;
             Goods goods = (Goods) chosenList.get(position);
 
-            Glide.with(context).load(goods.getFoodImg()).into(viewHolderFood.foodImage);
-            viewHolderFood.foodName.setText(goods.getFoodName());
-            String foodPrice = new DecimalFormat("0.00").format(goods.getFoodPrice());
+            // 读出美食图片
+            String filename = goods.getGoodsID()+".jpg";
+            String url = IOTool.pictureIp+"resources/food/images/"+filename;
+            String path = this.context.getFileStreamPath("food_"+filename).getPath();
+            File file = new File(path);
+            IOTool.savePicture(url, path);
+
+            Glide.with(context).load(file).into(viewHolderFood.foodImage);
+            viewHolderFood.foodName.setText(goods.getName());
+            String foodPrice = new DecimalFormat("0.00").format(goods.getPrice());
             viewHolderFood.foodPrice.setText(foodPrice);
-            viewHolderFood.foodNum.setText(goods.getFoodNum()+"");
+            viewHolderFood.foodNum.setText(goods.getNum()+"");
         }
     }
 
@@ -217,21 +238,26 @@ public class CartAdapter extends RecyclerView.Adapter {
     }
 
     //动态改变商家中选择的美食变化，position为添加的商家View位置
-    public void changeFood(int position, int storeNo, int[] changedFoods) {
-        Seller seller;
-        //测试数据
-        List<String> storeTags = new ArrayList<>();
-        storeTags.add("不好吃");
-        storeTags.add("冷饮");
-        seller = new Seller(storeNo, "食堂" + storeNo, R.drawable.ic_store_img, storeTags, storeNo+1, 2.00);
+    public void changeFood(int position, int[] changedFoods) {
+        Seller seller = (Seller) chosenList.get(position);
 
-        //先删除
+        // 获取该商店的美食列表
+        String url = IOTool.ip+"read/good/list.do";
+        List<String> list = new ArrayList<>();
+        list.add("sellerID="+seller.getSellerID());
+        IOTool.upAndDown(url, list);
+        JSONArray json = IOTool.getDateArray();
+        Type type = new TypeToken<List<Goods>>(){}.getType();
+        Gson gson = new Gson();
+        List<Goods> goodsList = gson.fromJson(json.toString(), type);
+
+        // 先删除
         deleteStore(position);
-        //再判断是否需要添加
+        // 再判断是否需要添加
         int flag = 0;
         List<Object> changedList = new ArrayList<>();
 
-        for(int i = 0; i< seller.getStoreFoodNum(); i++) {
+        for(int i = 0; i< goodsList.size(); i++) {
             if (changedFoods[i] != 0) {
                 flag = 1;
                 changedList.add(seller);
@@ -239,12 +265,10 @@ public class CartAdapter extends RecyclerView.Adapter {
             }
         }
         if(flag == 1) {
-            for(int i = 0; i< seller.getStoreFoodNum(); i++) {
+            for(int i = 0; i< goodsList.size(); i++) {
                 if(changedFoods[i] != 0) {
-                    Goods goods;
-                    //测试数据
-                    goods = new Goods(i, "泡椒风爪"+i, "食堂"+i, R.drawable.ic_food, 5.60, changedFoods[i]);
-
+                    Goods goods = goodsList.get(i);
+                    goods.setNum(changedFoods[i]);
                     changedList.add(goods);
                 }
             }

@@ -1,24 +1,22 @@
 package com.wy.schooltakenout.Adapter;
 
 import android.content.Context;
-import android.graphics.Color;
 import android.support.annotation.NonNull;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.RecyclerView;
-import android.util.DisplayMetrics;
-import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.bumptech.glide.Glide;
 import com.wy.schooltakenout.Data.Seller;
 import com.wy.schooltakenout.R;
+import com.wy.schooltakenout.Tool.IOTool;
+import com.wy.schooltakenout.Tool.TestPrinter;
 
-import java.text.DecimalFormat;
+import java.io.File;
 import java.util.List;
 
 public class StoreAdapter extends RecyclerView.Adapter<StoreAdapter.ViewHolder>{
@@ -34,8 +32,6 @@ public class StoreAdapter extends RecyclerView.Adapter<StoreAdapter.ViewHolder>{
 	    CardView itemView;
 		ImageView storeImage;
 		TextView storeName;
-		LinearLayout storeTags;
-		TextView storeFee;
 
 		private ViewHolder(View view){
 			super(view);
@@ -43,8 +39,6 @@ public class StoreAdapter extends RecyclerView.Adapter<StoreAdapter.ViewHolder>{
             itemView=(CardView) view;
 			storeImage=view.findViewById(R.id.store_img);
 			storeName=view.findViewById(R.id.store_name);
-			storeTags=view.findViewById(R.id.store_tags);
-			storeFee=view.findViewById(R.id.store_fee);
 		}
     }
 
@@ -66,35 +60,22 @@ public class StoreAdapter extends RecyclerView.Adapter<StoreAdapter.ViewHolder>{
         position = holder.getAdapterPosition();
 		Seller seller = sellerList.get(position);
 
-		holder.storeName.setText(seller.getStoreName());
-		Glide.with(context).load(seller.getStoreImg()).into(holder.storeImage);
-		//防止标签重复生成
-        holder.storeTags.removeAllViews();
-        //获取屏幕dpi，使标签可以正常显示（pixel会受分辨率影响，需要转化为dp）
-        DisplayMetrics metric = context.getResources().getDisplayMetrics();
-        double ddpi = metric.densityDpi / 160.0;
-        //动态添加标签
-		for(String storeTag: seller.getStoreTags()) {
-			TextView tagView = new TextView(context);
-			tagView.setText(storeTag);
-			tagView.setTextSize(12);
-			tagView.setTextColor(Color.rgb(143, 143, 143));
-			tagView.setGravity(Gravity.CENTER);
-//			tagView.setBackground(context.getResources().getDrawable(R.drawable.ic_tag));
-			holder.storeTags.addView(tagView);
-			tagView.getLayoutParams().width = (int) (40 * ddpi);
-			tagView.getLayoutParams().height = (int) (20 * ddpi);
-		}
-		//配置商家配送费
-		String feeString = "配送费"+(new DecimalFormat("0.00").format(seller.getStoreFee()));
-		holder.storeFee.setText(feeString);
+		// 读出商家头像
+		String filename = seller.getSellerID()+".jpg";
+		String url = IOTool.pictureIp+"resources/seller/head/"+filename;
+        String path = this.context.getFileStreamPath("store_"+filename).getPath();
+		File file = new File(path);
+		IOTool.savePicture(url, path);
+
+		Glide.with(context).load(file).into(holder.storeImage);
+		holder.storeName.setText(seller.getName());
 
 		//设置点击响应
         if(onItemClickListener!= null){
             holder.itemView.setOnClickListener( new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                	onItemClickListener.onClick(holder.getAdapterPosition(), sellerList.get(holder.getAdapterPosition()));
+                	onItemClickListener.onClick(sellerList.get(holder.getAdapterPosition()));
                 }
             });
         }
@@ -108,7 +89,7 @@ public class StoreAdapter extends RecyclerView.Adapter<StoreAdapter.ViewHolder>{
 	//设置点击响应
     private OnItemClickListener onItemClickListener;
     public interface OnItemClickListener{
-        void onClick(int position, Seller thisSeller);
+        void onClick(Seller thisSeller);
     }
     public void setOnItemClickListener(OnItemClickListener onItemClickListener ){
         this.onItemClickListener=onItemClickListener;
